@@ -32,57 +32,37 @@ function getTabList(all, group, window, workspaceOpt, screenOpt) {
   let windows = []; // the array to return
   let winlist = []; // the candidate windows
 
-  if (!all) {
-    winlist = display.get_tab_list(Meta.TabList.NORMAL_ALL, screen, workspace);
-    if (group) {
-      let app;
-      if (window && Main.isInteresting(window)) {
-        app = tracker.get_window_app(window);
-      } else {
-        app = winlist.length > 0 ? tracker.get_window_app(winlist[0]) : null;
-      }
-      winlist = app ? app.get_windows() : (window && Main.isInteresting(window) ? [window] : (winlist[0] ? [winlist[0]] : []));
+    let windowActors = global.get_window_actors();
+    for (i in windowActors) {
+	winlist.push(windowActors[i].get_meta_window());
     }
-  } else {
-    let n = screen.get_n_workspaces();
-    for (let i = 0; i < n; i ++) {
-      winlist = winlist.concat(display.get_tab_list(Meta.TabList.NORMAL_ALL,
-        screen, screen.get_workspace_by_index(i)));
+    
+    for (i in windowActors) {
+	winlist.push(windowActors[i].get_meta_window());
+    }    
+    
+    let registry = {}; // to avoid duplicates 
+    for (let i = 0; i < winlist.length; ++i) {
+	let win = winlist[i];
+	if (Main.isInteresting(win)) {
+	    let seqno = win.get_stable_sequence();
+	    if (!registry[seqno]) {
+		windows.push(win);
+		registry[seqno] = true; // there may be duplicates in the list (rare)
+	    }
+	}
     }
-  }
 
-  let registry = {}; // to avoid duplicates 
-  for (let i = 0; i < winlist.length; ++i) {
-    let win = winlist[i];
-    if (Main.isInteresting(win)) {
-      let seqno = win.get_stable_sequence();
-      if (!registry[seqno]) {
-        windows.push(win);
-        registry[seqno] = true; // there may be duplicates in the list (rare)
-      }
-    }
-  }
-  // from cinnamon_app_compare_windows()
-  windows.sort(Lang.bind(this, function(w1, w2) {
-    let ws_1 = w1.get_workspace() == global.screen.get_active_workspace();
-    let ws_2 = w2.get_workspace() == global.screen.get_active_workspace();
+    windows.sort(Lang.bind(this,
+			   function(win1, win2) {
+			       let t1 = win1.get_user_time();
+			       let t2 = win2.get_user_time();
+			       
+			       return (t2 > t1) ? 1 : -1 ;
+			   }
+			  ));    
 
-    if (ws_1 && !ws_2)
-      return -1;
-    else if (!ws_1 && ws_2)
-      return 1;
-
-    let vis_1= w1.showing_on_its_workspace();
-    let vis_2 = w2.showing_on_its_workspace();
-
-    if (vis_1 && !vis_2)
-      return -1;
-    else if (!vis_1 && vis_2)
-      return 1;
-
-    return (w2.get_user_time() - w1.get_user_time());
-  }));
-  return windows;
+    return windows;
 }
 
 function ThumbnailGrid(params) {
